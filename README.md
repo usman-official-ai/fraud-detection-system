@@ -1,10 +1,15 @@
-# 🛡️ Credit Card Fraud Detection System
+# 🛡️ Credit Card Fraud Detection System 
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28.0-red.svg)](https://streamlit.io/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-1.7.6-orange.svg)](https://xgboost.ai/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)   
+
+  <img width="1536" height="1024" alt="ChatGPT Image Jul 17, 2026, 01_43_57 PM" src="https://github.com/user-attachments/assets/5a13e160-8865-40d5-bcc5-8492911eba7f" />  
+
+     
+
 
 A **production-ready** machine learning system for real-time credit card fraud detection with **97.9% accuracy**. Built with modern MLOps practices including a REST API, interactive dashboard, and batch processing capabilities.
 
