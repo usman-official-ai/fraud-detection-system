@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import time
 import random
 
 st.set_page_config(page_title="Fraud Detection System", layout="wide")
@@ -160,27 +159,29 @@ if fraud_sample_btn:
 
 # Prediction logic
 if predict_btn:
-    with st.spinner("🔍 Analyzing transaction..."):
-        time.sleep(0.5)  # Simulate processing
-        result = mock_predict()
-        
-        st.divider()
-        st.subheader("📊 Prediction Result")
-        
-        # Show fraud status with color
-        if result['is_fraud']:
-            st.error(f"⚠️ FRAUD DETECTED!")
-        else:
-            st.success(f"✅ Transaction is Legitimate")
-        
-        # Metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Fraud Probability", f"{result['fraud_probability']*100:.2f}%")
-        with col2:
-            st.metric("Risk Score", f"{result['risk_score']:.2f}")
-        with col3:
-            st.metric("Processing Time", f"{result['processing_time_ms']:.2f} ms")
+    result = mock_predict()
+    
+    st.divider()
+    st.subheader("📊 Prediction Result")
+    
+    # Show fraud status with color
+    if result['is_fraud']:
+        st.error(f"⚠️ FRAUD DETECTED!")
+    else:
+        st.success(f"✅ Transaction is Legitimate")
+    
+    # Metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Fraud Probability", f"{result['fraud_probability']*100:.2f}%")
+    with col2:
+        st.metric("Risk Score", f"{result['risk_score']:.2f}")
+    with col3:
+        st.metric("Processing Time", f"{result['processing_time_ms']:.2f} ms")
+    
+    # Show full response
+    with st.expander("📋 Full Details"):
+        st.json(result)
 
 st.divider()
 st.caption("Built with ❤️ using Streamlit, FastAPI, and XGBoost")
