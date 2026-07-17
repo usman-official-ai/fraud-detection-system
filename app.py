@@ -21,7 +21,7 @@ api_mode = st.sidebar.radio(
 if api_mode == "Use Real API (FastAPI)":
     api_url = st.sidebar.text_input(
         "API Endpoint",
-        value="http://127.0.0.1:8000/predict",
+        value="https://fraud-detection-api.onrender.com/predict",  # <-- PUBLIC URL
         help="URL of the FastAPI backend"
     )
     if st.sidebar.button("🔌 Test API"):
@@ -30,10 +30,11 @@ if api_mode == "Use Real API (FastAPI)":
             response = requests.get(health_url, timeout=5)
             if response.status_code == 200:
                 st.sidebar.success("✅ API is running!")
+                st.sidebar.json(response.json())
             else:
                 st.sidebar.error(f"❌ API Error: {response.status_code}")
-        except:
-            st.sidebar.error("❌ Cannot connect to API")
+        except Exception as e:
+            st.sidebar.error(f"❌ Cannot connect: {str(e)}")
 else:
     api_url = None
     st.sidebar.info("ℹ️ Using mock predictions (no API needed)")
@@ -61,7 +62,7 @@ def get_prediction(features_list):
             if response.status_code == 200:
                 return response.json()
             else:
-                return {"error": f"API Error: {response.status_code}"}
+                return {"error": f"API Error: {response.status_code} - {response.text}"}
         except Exception as e:
             return {"error": str(e)}
     else:
