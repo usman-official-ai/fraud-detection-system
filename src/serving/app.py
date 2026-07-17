@@ -4,25 +4,22 @@ import numpy as np
 import pandas as pd
 import joblib
 import logging
-from typing import List, Optional
+from typing import List
 import time
-from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Fraud Detection API",
-    description="Real-time credit card fraud detection",
-    version="1.0.0"
-)
+app = FastAPI()
 
-# Load models and transformers
+# Load model
 try:
     model = joblib.load('models/production_model.pkl')
     scaler = joblib.load('models/scaler.pkl')
     imputer = joblib.load('models/imputer.pkl')
-    logger.info("Model, scaler, and imputer loaded successfully")
+    logger.info("✅ Model loaded successfully")
+    logger.info(f"Model expects {model.n_features_in_} features")
+    logger.info(f"Scaler expects {scaler.n_features_in_} features")
 except Exception as e:
     logger.error(f"Failed to load model: {e}")
     model = None
@@ -30,201 +27,96 @@ except Exception as e:
     imputer = None
 
 class TransactionRequest(BaseModel):
-    Time: float
-    V1: float
-    V2: float
-    V3: float
-    V4: float
-    V5: float
-    V6: float
-    V7: float
-    V8: float
-    V9: float
-    V10: float
-    V11: float
-    V12: float
-    V13: float
-    V14: float
-    V15: float
-    V16: float
-    V17: float
-    V18: float
-    V19: float
-    V20: float
-    V21: float
-    V22: float
-    V23: float
-    V24: float
-    V25: float
-    V26: float
-    V27: float
-    V28: float
-    Amount: float
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "Time": 0.0,
-                "V1": -1.359807,
-                "V2": -0.072781,
-                "V3": 2.536347,
-                "V4": 1.378155,
-                "V5": -0.338321,
-                "V6": 0.462388,
-                "V7": 0.239599,
-                "V8": 0.098698,
-                "V9": 0.363787,
-                "V10": 0.090794,
-                "V11": -0.551600,
-                "V12": -0.617801,
-                "V13": -0.991390,
-                "V14": -0.311169,
-                "V15": 1.468177,
-                "V16": -0.470401,
-                "V17": 0.207971,
-                "V18": 0.025791,
-                "V19": 0.403993,
-                "V20": 0.251412,
-                "V21": -0.018307,
-                "V22": 0.277838,
-                "V23": -0.110474,
-                "V24": 0.066928,
-                "V25": 0.128539,
-                "V26": -0.189115,
-                "V27": 0.133558,
-                "V28": -0.021053,
-                "Amount": 149.62
-            }
-        }
+    features: List[float]
 
-class PredictionResponse(BaseModel):
-    is_fraud: bool
-    fraud_probability: float
-    risk_score: float
-    processing_time_ms: float
-
-def engineer_features(df):
-    """Apply the same feature engineering as training"""
-    df_copy = df.copy()
-    
-    # Time-based features
-    if 'Time' in df_copy.columns:
-        df_copy['hour'] = df_copy['Time'] // 3600 % 24
-        df_copy['day'] = df_copy['Time'] // (3600 * 24)
-    
-    # Amount features
-    if 'Amount' in df_copy.columns:
-        df_copy['amount_log'] = np.log1p(df_copy['Amount'])
-    
-    # Interaction features
-    if 'V1' in df_copy.columns and 'V2' in df_copy.columns:
-        df_copy['V1_V2_interaction'] = df_copy['V1'] * df_copy['V2']
-    
-    if 'V3' in df_copy.columns and 'V4' in df_copy.columns:
-        df_copy['V3_V4_interaction'] = df_copy['V3'] * df_copy['V4']
-    
-    if 'Amount' in df_copy.columns and 'V1' in df_copy.columns:
-        df_copy['amount_v1_ratio'] = df_copy['Amount'] / (abs(df_copy['V1']) + 1)
-    
-    return df_copy
-
-@app.get("/")
-async def root():
-    return {
-        "message": "Fraud Detection API",
-        "status": "healthy" if model else "unhealthy",
-        "version": "1.0.0"
-    }
-
-@app.post("/predict", response_model=PredictionResponse)
+@app.post("/predict")
 async def predict(request: TransactionRequest):
-    if model is None or scaler is None or imputer is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+    if model is None:
+        raise HTTPException(503, "Model not loaded")
     
-    start_time = time.time()
+    start = time.time()
     
     try:
-        # Convert to DataFrame
-        df = pd.DataFrame([request.dict()])
+        # Step 1: Input features
+        logger.info(f"Input features count: {len(request.features)}")
         
-        # Apply feature engineering
-        df_engineered = engineer_features(df)
+        # Step 2: Create DataFrame
+        cols = ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
+                'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18',
+                'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
+                'V28', 'Amount']
         
-        # Get numeric columns for imputation
-        numeric_cols = df_engineered.select_dtypes(include=[np.number]).columns.tolist()
+        df = pd.DataFrame([request.features], columns=cols)
+        logger.info(f"DataFrame shape after creation: {df.shape}")
         
-        # Apply imputation
-        df_imputed = df_engineered.copy()
-        df_imputed[numeric_cols] = imputer.transform(df_engineered[numeric_cols])
+        # Step 3: Feature engineering
+        df_copy = df.copy()
         
-        # Apply scaling
-        df_scaled = df_imputed.copy()
-        df_scaled[numeric_cols] = scaler.transform(df_imputed[numeric_cols])
+        # Time features
+        if 'Time' in df_copy.columns:
+            df_copy['hour'] = df_copy['Time'] // 3600 % 24
+            df_copy['day'] = df_copy['Time'] // (3600 * 24)
         
-        # Predict
-        probability = model.predict_proba(df_scaled)[0, 1]
-        prediction = int(probability >= 0.5)
+        # Amount features
+        if 'Amount' in df_copy.columns:
+            df_copy['amount_log'] = np.log1p(df_copy['Amount'])
         
-        processing_time = (time.time() - start_time) * 1000
+        # Interaction features
+        if 'V1' in df_copy.columns and 'V2' in df_copy.columns:
+            df_copy['V1_V2_interaction'] = df_copy['V1'] * df_copy['V2']
         
-        return PredictionResponse(
-            is_fraud=bool(prediction),
-            fraud_probability=float(probability),
-            risk_score=float(probability * 100),
-            processing_time_ms=round(processing_time, 2)
+        if 'V3' in df_copy.columns and 'V4' in df_copy.columns:
+            df_copy['V3_V4_interaction'] = df_copy['V3'] * df_copy['V4']
+        
+        if 'Amount' in df_copy.columns and 'V1' in df_copy.columns:
+            df_copy['amount_v1_ratio'] = df_copy['Amount'] / (abs(df_copy['V1']) + 1)
+        
+        # Ensure 36 columns
+        final_columns = [
+            'Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
+            'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18',
+            'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
+            'V28', 'Amount', 'hour', 'day', 'amount_log', 
+            'V1_V2_interaction', 'V3_V4_interaction', 'amount_v1_ratio'
+        ]
+        
+        for col in final_columns:
+            if col not in df_copy.columns:
+                df_copy[col] = 0.0
+        
+        df_eng = df_copy[final_columns]
+        logger.info(f"After feature engineering shape: {df_eng.shape}")
+        logger.info(f"Columns: {df_eng.columns.tolist()}")
+        
+        # Step 4: Impute
+        df_imp = pd.DataFrame(
+            imputer.transform(df_eng),
+            columns=df_eng.columns
         )
+        logger.info(f"After imputation shape: {df_imp.shape}")
+        
+        # Step 5: Scale
+        df_scaled = pd.DataFrame(
+            scaler.transform(df_imp),
+            columns=df_imp.columns
+        )
+        logger.info(f"After scaling shape: {df_scaled.shape}")
+        
+        # Step 6: Predict
+        prob = model.predict_proba(df_scaled)[0, 1]
+        pred = int(prob >= 0.5)
+        
+        return {
+            "is_fraud": bool(pred),
+            "fraud_probability": float(prob),
+            "risk_score": float(prob * 100),
+            "processing_time_ms": round((time.time() - start) * 1000, 2)
+        }
     
     except Exception as e:
         logger.error(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/predict/batch")
-async def predict_batch(transactions: List[TransactionRequest]):
-    if model is None or scaler is None or imputer is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    
-    start_time = time.time()
-    
-    try:
-        # Convert to DataFrame
-        df = pd.DataFrame([t.dict() for t in transactions])
-        
-        # Apply feature engineering
-        df_engineered = engineer_features(df)
-        
-        # Get numeric columns for imputation
-        numeric_cols = df_engineered.select_dtypes(include=[np.number]).columns.tolist()
-        
-        # Apply imputation
-        df_imputed = df_engineered.copy()
-        df_imputed[numeric_cols] = imputer.transform(df_engineered[numeric_cols])
-        
-        # Apply scaling
-        df_scaled = df_imputed.copy()
-        df_scaled[numeric_cols] = scaler.transform(df_imputed[numeric_cols])
-        
-        # Predict
-        probabilities = model.predict_proba(df_scaled)[:, 1]
-        predictions = (probabilities >= 0.5).astype(int)
-        
-        processing_time = (time.time() - start_time) * 1000
-        
-        return {
-            "predictions": predictions.tolist(),
-            "probabilities": probabilities.tolist(),
-            "processing_time_ms": round(processing_time, 2),
-            "count": len(transactions)
-        }
-    
-    except Exception as e:
-        logger.error(f"Batch prediction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, f"Prediction error: {str(e)}")
 
 @app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "scaler_loaded": scaler is not None,
-        "imputer_loaded": imputer is not None
-    }
+async def health():
+    return {"status": "healthy", "model_loaded": model is not None}
