@@ -1,0 +1,146 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+pythonenv*
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# MLflow
+mlruns/
+mlflow.db
+
+# DVC
+.dvc/
+.dvcignore
+
+# Data files
+data/
+*.csv
+*.xlsx
+*.xls
+*.json
+*.db
+*.sqlite3
+*.sqlite
+
+# Models
+models/
+*.pkl
+*.joblib
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local development
+sample.json
+test_*.py
+*.tmp
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# K8s secrets
+*.secret.yaml
+secrets.yaml
+
+# Virtual Environment
+*.whl
+*.tar.gz
+*.zip
+
+# Project specific
+models/
+data/
+mlruns/
+*.pkl
+*.joblib
+*.csv
+!requirements/*.txt
+!README.md
+
+# Large files (>100MB)
+*.parquet
+*.feather
+*.arrow
+*.npy
+*.npz
+
+# Logs
+*.log
