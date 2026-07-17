@@ -8,7 +8,9 @@
 
   <img width="1536" height="1024" alt="ChatGPT Image Jul 17, 2026, 01_43_57 PM" src="https://github.com/user-attachments/assets/5a13e160-8865-40d5-bcc5-8492911eba7f" />  
 
-     
+## LIVE APP  
+
+  https://fraud-detection-system-xgemzmodpn9egbgnazaa5x.streamlit.app/
 
 
 A **production-ready** machine learning system for real-time credit card fraud detection with **97.9% accuracy**. Built with modern MLOps practices including a REST API, interactive dashboard, and batch processing capabilities.
