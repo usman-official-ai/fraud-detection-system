@@ -4,47 +4,52 @@ import numpy as np
 import json
 import time
 import random
-from google import genai  # <-- Naya import
-from google.genai import types  # <-- Optional, for advanced features
+
+# ============================================
+# SIRF GOOGLE-GENAI USE KARO (NO FALLBACK)
+# ============================================
+try:
+    from google import genai
+    from google.genai import types
+    GEMINI_AVAILABLE = True
+    print("✅ Using google-genai SDK")
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("❌ google-genai not installed. Using mock mode.")
 
 st.set_page_config(page_title="Fraud Detection System", layout="wide")
 st.title("🛡️ Credit Card Fraud Detection System")
 
 # ============================================
-# GEMINI API INITIALIZATION (NEW SDK)
+# GEMINI API INITIALIZATION
 # ============================================
 def init_gemini():
-    """Initialize Gemini API using the new google-genai SDK"""
+    if not GEMINI_AVAILABLE:
+        return None
+    
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
-        if api_key:
-            # Naya SDK client
-            client = genai.Client(api_key=api_key)  # <-- Naya tarika
-            return client
-        else:
-            st.warning("⚠️ GEMINI_API_KEY not found in secrets. Using mock mode.")
+        if not api_key or not api_key.startswith("AIzaSy"):
             return None
+        
+        client = genai.Client(api_key=api_key)
+        return client
     except Exception as e:
-        st.warning(f"⚠️ Gemini initialization failed: {e}. Using mock mode.")
+        print(f"Gemini init error: {e}")
         return None
 
-# Initialize Gemini client
 gemini_client = init_gemini()
 
 # ============================================
-# PREDICTION FUNCTION (UPDATED)
+# PREDICTION FUNCTION
 # ============================================
 def get_prediction(features_list):
-    """Get prediction using new Gemini API or fallback to mock"""
-    
     if gemini_client:
         try:
-            # Prepare features for Gemini
             features_text = create_feature_text(features_list)
             
-            # Naya SDK model call
             response = gemini_client.models.generate_content(
-                model='gemini-2.0-flash-exp',  # Ya koi bhi model
+                model='gemini-1.5-flash',
                 contents=features_text,
                 config=types.GenerateContentConfig(
                     temperature=0.2,
@@ -52,10 +57,9 @@ def get_prediction(features_list):
                 )
             )
             
-            # Parse response
             response_text = response.text.strip()
             
-            # Remove markdown code blocks if present
+            # Clean JSON
             if response_text.startswith("```json"):
                 response_text = response_text[7:]
             if response_text.startswith("```"):
@@ -64,8 +68,6 @@ def get_prediction(features_list):
                 response_text = response_text[:-3]
             
             response_text = response_text.strip()
-            
-            # Parse JSON
             result = json.loads(response_text)
             
             return {
@@ -77,14 +79,13 @@ def get_prediction(features_list):
             }
             
         except Exception as e:
-            st.warning(f"⚠️ Gemini API error: {e}. Using mock prediction.")
+            st.warning(f"⚠️ Gemini API error: {e}")
             return mock_predict(features_list)
     
     else:
         return mock_predict(features_list)
 
 def create_feature_text(features_list):
-    """Convert features list to readable text"""
     feature_names = ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
                      'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18',
                      'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
@@ -98,14 +99,20 @@ def create_feature_text(features_list):
         else:
             text += f"- {name}: {value:.6f}\n"
     
-    text += "\nReturn this exact JSON format:\n"
-    text += '{"is_fraud": true/false, "fraud_probability": 0.XX, "risk_score": XX.XX, "reason": "Brief reason"}'
+    text += "\nRules:\n"
+    text += "- Amount > 5000 increases risk\n"
+    text += "- V1 < -2.0 is suspicious\n"
+    text += "- V2 > 1.5 is suspicious\n"
+    text += "- V3 > 2.0 or V3 < -2.0 is suspicious\n"
+    text += "- V4 > 2.0 is suspicious\n"
+    text += "- Multiple suspicious features = higher risk\n\n"
+    
+    text += 'Return this exact JSON: {"is_fraud": true/false, "fraud_probability": 0.XX, "risk_score": XX.XX, "reason": "Brief reason"}'
     
     return text
 
 def mock_predict(features_list):
-    """Smart mock prediction (fallback)"""
-    time = features_list[0]
+    time_val = features_list[0]
     v1 = features_list[1]
     v2 = features_list[2]
     v3 = features_list[3]
@@ -114,7 +121,6 @@ def mock_predict(features_list):
     
     risk_score = 0.0
     
-    # Amount-based risk
     if amount > 1000:
         risk_score += 0.3
     if amount > 5000:
@@ -122,45 +128,36 @@ def mock_predict(features_list):
     if amount > 10000:
         risk_score += 0.2
     
-    # V1 pattern (strong fraud indicator)
     if v1 < -2.0:
         risk_score += 0.4
     elif v1 < -1.0:
         risk_score += 0.2
     
-    # V2 pattern
     if v2 > 1.5:
         risk_score += 0.2
     elif v2 < -2.0:
         risk_score += 0.2
     
-    # V3 pattern
     if v3 > 2.0:
         risk_score += 0.2
     elif v3 < -2.0:
         risk_score += 0.1
     
-    # V4 pattern
     if v4 > 2.0:
         risk_score += 0.2
     
-    # V11 pattern
     if features_list[10] > 2.0:
         risk_score += 0.2
     
-    # V14 pattern
     if features_list[13] < -2.0:
         risk_score += 0.2
     
-    # Time-based risk
-    if time > 100000:
+    if time_val > 100000:
         risk_score += 0.1
     
-    # Amount vs V1 interaction
     if v1 < -1.5 and amount > 500:
         risk_score += 0.2
     
-    # Add some randomness
     risk_score += random.uniform(-0.05, 0.05)
     risk_score = max(0.0, min(1.0, risk_score))
     
@@ -177,20 +174,18 @@ def mock_predict(features_list):
     }
 
 # ============================================
-# SIDEBAR CONFIG
+# SIDEBAR
 # ============================================
 st.sidebar.header("⚙️ Configuration")
 
-# Show Gemini status
 if gemini_client:
-    st.sidebar.success("✅ Gemini API connected (google-genai)")
+    st.sidebar.success("✅ Gemini API connected")
 else:
     st.sidebar.warning("⚠️ Using mock mode")
-    st.sidebar.info("Add GEMINI_API_KEY to secrets for real predictions")
+    st.sidebar.info("Add GEMINI_API_KEY (AIzaSy...) to secrets")
 
 st.sidebar.divider()
 
-# Input Method
 st.sidebar.subheader("📥 Input Method")
 input_method = st.sidebar.radio(
     "Choose input method:",
@@ -251,7 +246,6 @@ if input_method == "Manual Input":
     with col3:
         predict_btn = st.button("🔍 Predict Fraud", type="primary", use_container_width=True)
     
-    # Load sample data
     if sample_btn:
         st.session_state['time'] = 0.0
         st.session_state['v1'] = -1.359807
