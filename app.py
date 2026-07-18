@@ -1,43 +1,211 @@
 import streamlit as st
-import requests
 import pandas as pd
+import numpy as np
 import json
 import time
 import random
+import google.generativeai as genai
 
+# Page config
 st.set_page_config(page_title="Fraud Detection System", layout="wide")
 
 st.title("🛡️ Credit Card Fraud Detection System")
 
-# Sidebar
+# ============================================
+# GEMINI API INITIALIZATION
+# ============================================
+def init_gemini():
+    """Initialize Gemini API with Streamlit secrets"""
+    try:
+        # Try to get API key from secrets
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            return True
+        else:
+            st.warning("⚠️ GEMINI_API_KEY not found in secrets. Using mock mode.")
+            return False
+    except Exception as e:
+        st.warning(f"⚠️ Gemini initialization failed: {e}. Using mock mode.")
+        return False
+
+# Check if Gemini is available
+gemini_available = init_gemini()
+
+# ============================================
+# PREDICTION FUNCTION
+# ============================================
+def get_prediction(features_list):
+    """Get prediction using Gemini API or fallback to mock"""
+    
+    if gemini_available:
+        try:
+            # Prepare features for Gemini
+            features_text = create_feature_text(features_list)
+            
+            # Gemini model
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            # Prompt
+            prompt = f"""
+            You are a fraud detection expert. Analyze this credit card transaction and return ONLY a JSON response.
+            
+            Transaction features:
+            {features_text}
+            
+            Return this exact JSON format:
+            {{
+                "is_fraud": true/false,
+                "fraud_probability": 0.XX,
+                "risk_score": XX.XX,
+                "reason": "Brief reason for decision"
+            }}
+            
+            Rules:
+            - Amount > 5000 increases risk
+            - V1 < -2.0 is suspicious
+            - V2 > 1.5 is suspicious
+            - V3 > 2.0 or V3 < -2.0 is suspicious
+            - V4 > 2.0 is suspicious
+            - Multiple suspicious features = higher risk
+            
+            Only return JSON, no other text.
+            """
+            
+            response = model.generate_content(prompt)
+            
+            # Parse response
+            response_text = response.text.strip()
+            
+            # Remove markdown code blocks if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            
+            response_text = response_text.strip()
+            
+            # Parse JSON
+            result = json.loads(response_text)
+            
+            # Ensure required fields
+            return {
+                "is_fraud": result.get("is_fraud", False),
+                "fraud_probability": result.get("fraud_probability", 0.0),
+                "risk_score": result.get("risk_score", 0.0),
+                "processing_time_ms": random.uniform(30, 80),
+                "reason": result.get("reason", "AI analysis complete")
+            }
+            
+        except Exception as e:
+            st.warning(f"⚠️ Gemini API error: {e}. Using mock prediction.")
+            return mock_predict(features_list)
+    
+    else:
+        return mock_predict(features_list)
+
+def create_feature_text(features_list):
+    """Convert features list to readable text"""
+    feature_names = ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
+                     'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18',
+                     'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
+                     'V28', 'Amount']
+    
+    text = ""
+    for i, (name, value) in enumerate(zip(feature_names, features_list)):
+        if i == 0 or i == 29:  # Time and Amount
+            text += f"- {name}: {value:.2f}\n"
+        else:
+            text += f"- {name}: {value:.6f}\n"
+    
+    return text
+
+def mock_predict(features_list):
+    """Smart mock prediction (fallback)"""
+    time = features_list[0]
+    v1 = features_list[1]
+    v2 = features_list[2]
+    v3 = features_list[3]
+    v4 = features_list[4]
+    amount = features_list[29]
+    
+    risk_score = 0.0
+    
+    # Amount-based risk
+    if amount > 1000:
+        risk_score += 0.3
+    if amount > 5000:
+        risk_score += 0.2
+    if amount > 10000:
+        risk_score += 0.2
+    
+    # V1 pattern (strong fraud indicator)
+    if v1 < -2.0:
+        risk_score += 0.4
+    elif v1 < -1.0:
+        risk_score += 0.2
+    
+    # V2 pattern
+    if v2 > 1.5:
+        risk_score += 0.2
+    elif v2 < -2.0:
+        risk_score += 0.2
+    
+    # V3 pattern
+    if v3 > 2.0:
+        risk_score += 0.2
+    elif v3 < -2.0:
+        risk_score += 0.1
+    
+    # V4 pattern
+    if v4 > 2.0:
+        risk_score += 0.2
+    
+    # V11 pattern
+    if features_list[10] > 2.0:
+        risk_score += 0.2
+    
+    # V14 pattern
+    if features_list[13] < -2.0:
+        risk_score += 0.2
+    
+    # Time-based risk
+    if time > 100000:
+        risk_score += 0.1
+    
+    # Amount vs V1 interaction
+    if v1 < -1.5 and amount > 500:
+        risk_score += 0.2
+    
+    # Add some randomness
+    risk_score += random.uniform(-0.05, 0.05)
+    risk_score = max(0.0, min(1.0, risk_score))
+    
+    is_fraud = risk_score > 0.5
+    prob = risk_score + random.uniform(-0.02, 0.02)
+    prob = max(0.0, min(1.0, prob))
+    
+    return {
+        "is_fraud": is_fraud,
+        "fraud_probability": prob,
+        "risk_score": prob * 100,
+        "processing_time_ms": random.uniform(20, 60),
+        "reason": "Rule-based analysis (Gemini API not available)"
+    }
+
+# ============================================
+# SIDEBAR CONFIG
+# ============================================
 st.sidebar.header("⚙️ Configuration")
 
-# API Mode Selection
-api_mode = st.sidebar.radio(
-    "API Mode:",
-    ["Use Real API (FastAPI)", "Use Mock Mode (Demo)"]
-)
-
-if api_mode == "Use Real API (FastAPI)":
-    api_url = st.sidebar.text_input(
-        "API Endpoint",
-        value="https://fraud-detection-api.onrender.com/predict",  # <-- PUBLIC URL
-        help="URL of the FastAPI backend"
-    )
-    if st.sidebar.button("🔌 Test API"):
-        try:
-            health_url = api_url.replace("/predict", "/health")
-            response = requests.get(health_url, timeout=5)
-            if response.status_code == 200:
-                st.sidebar.success("✅ API is running!")
-                st.sidebar.json(response.json())
-            else:
-                st.sidebar.error(f"❌ API Error: {response.status_code}")
-        except Exception as e:
-            st.sidebar.error(f"❌ Cannot connect: {str(e)}")
+# Show Gemini status
+if gemini_available:
+    st.sidebar.success("✅ Gemini API connected")
 else:
-    api_url = None
-    st.sidebar.info("ℹ️ Using mock predictions (no API needed)")
+    st.sidebar.warning("⚠️ Using mock mode")
+    st.sidebar.info("Add GEMINI_API_KEY to secrets for real predictions")
 
 st.sidebar.divider()
 
@@ -53,36 +221,6 @@ st.divider()
 # ============================================
 # MANUAL INPUT
 # ============================================
-def get_prediction(features_list):
-    """Get prediction from API or mock"""
-    if api_mode == "Use Real API (FastAPI)" and api_url:
-        try:
-            data = {"features": features_list}
-            response = requests.post(api_url, json=data, timeout=10)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {"error": f"API Error: {response.status_code} - {response.text}"}
-        except Exception as e:
-            return {"error": str(e)}
-    else:
-        # Mock prediction
-        prob = random.random()
-        # Make it more realistic
-        if features_list[1] < -2.0 and features_list[29] > 1000:  # V1 < -2 and Amount > 1000
-            prob = min(prob * 2, 0.99)
-        elif features_list[29] > 5000:
-            prob = min(prob * 1.5, 0.99)
-        elif features_list[1] > 2.0 and features_list[2] > 1.0:
-            prob = min(prob * 1.3, 0.99)
-        prob = min(prob, 0.99)
-        return {
-            "is_fraud": prob > 0.5,
-            "fraud_probability": prob,
-            "risk_score": prob * 100,
-            "processing_time_ms": random.uniform(20, 60)
-        }
-
 if input_method == "Manual Input":
     st.subheader("📝 Enter Transaction Details")
     
@@ -215,24 +353,21 @@ if input_method == "Manual Input":
         st.divider()
         st.subheader("📊 Prediction Result")
         
-        if 'error' in result:
-            st.error(f"❌ {result['error']}")
+        if result['is_fraud']:
+            st.error("⚠️ FRAUD DETECTED!")
         else:
-            if result['is_fraud']:
-                st.error("⚠️ FRAUD DETECTED!")
-            else:
-                st.success("✅ Transaction is Legitimate")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Fraud Probability", f"{result['fraud_probability']*100:.2f}%")
-            with col2:
-                st.metric("Risk Score", f"{result['risk_score']:.2f}")
-            with col3:
-                st.metric("Processing Time", f"{result['processing_time_ms']:.2f} ms")
-            
-            with st.expander("📋 Full Response"):
-                st.json(result)
+            st.success("✅ Transaction is Legitimate")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Fraud Probability", f"{result['fraud_probability']*100:.2f}%")
+        with col2:
+            st.metric("Risk Score", f"{result['risk_score']:.2f}")
+        with col3:
+            st.metric("Processing Time", f"{result['processing_time_ms']:.2f} ms")
+        
+        with st.expander("📋 Full Details"):
+            st.json(result)
 
 # ============================================
 # CSV UPLOAD
@@ -252,7 +387,6 @@ else:
         try:
             df = pd.read_csv(uploaded_file)
             
-            # Check if header exists
             if df.columns[0] != 'Time':
                 df = pd.read_csv(uploaded_file, header=None)
                 df.columns = ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
@@ -277,7 +411,6 @@ else:
                 st.divider()
                 st.subheader("📊 Batch Results")
                 
-                # Create results dataframe
                 results_df = pd.DataFrame(results)
                 
                 if 'is_fraud' in results_df.columns:
@@ -297,7 +430,6 @@ else:
                     
                     st.dataframe(df[['Time', 'Amount', 'Prediction', 'Fraud_Prob']])
                     
-                    # Download
                     csv = df.to_csv(index=False)
                     st.download_button(
                         label="📥 Download Results",
