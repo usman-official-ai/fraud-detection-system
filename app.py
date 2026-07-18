@@ -4,75 +4,53 @@ import numpy as np
 import json
 import time
 import random
-import google.generativeai as genai
+from google import genai  # <-- Naya import
+from google.genai import types  # <-- Optional, for advanced features
 
-# Page config
 st.set_page_config(page_title="Fraud Detection System", layout="wide")
-
 st.title("🛡️ Credit Card Fraud Detection System")
 
 # ============================================
-# GEMINI API INITIALIZATION
+# GEMINI API INITIALIZATION (NEW SDK)
 # ============================================
 def init_gemini():
-    """Initialize Gemini API with Streamlit secrets"""
+    """Initialize Gemini API using the new google-genai SDK"""
     try:
-        # Try to get API key from secrets
         api_key = st.secrets.get("GEMINI_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
-            return True
+            # Naya SDK client
+            client = genai.Client(api_key=api_key)  # <-- Naya tarika
+            return client
         else:
             st.warning("⚠️ GEMINI_API_KEY not found in secrets. Using mock mode.")
-            return False
+            return None
     except Exception as e:
         st.warning(f"⚠️ Gemini initialization failed: {e}. Using mock mode.")
-        return False
+        return None
 
-# Check if Gemini is available
-gemini_available = init_gemini()
+# Initialize Gemini client
+gemini_client = init_gemini()
 
 # ============================================
-# PREDICTION FUNCTION
+# PREDICTION FUNCTION (UPDATED)
 # ============================================
 def get_prediction(features_list):
-    """Get prediction using Gemini API or fallback to mock"""
+    """Get prediction using new Gemini API or fallback to mock"""
     
-    if gemini_available:
+    if gemini_client:
         try:
             # Prepare features for Gemini
             features_text = create_feature_text(features_list)
             
-            # Gemini model
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
-            # Prompt
-            prompt = f"""
-            You are a fraud detection expert. Analyze this credit card transaction and return ONLY a JSON response.
-            
-            Transaction features:
-            {features_text}
-            
-            Return this exact JSON format:
-            {{
-                "is_fraud": true/false,
-                "fraud_probability": 0.XX,
-                "risk_score": XX.XX,
-                "reason": "Brief reason for decision"
-            }}
-            
-            Rules:
-            - Amount > 5000 increases risk
-            - V1 < -2.0 is suspicious
-            - V2 > 1.5 is suspicious
-            - V3 > 2.0 or V3 < -2.0 is suspicious
-            - V4 > 2.0 is suspicious
-            - Multiple suspicious features = higher risk
-            
-            Only return JSON, no other text.
-            """
-            
-            response = model.generate_content(prompt)
+            # Naya SDK model call
+            response = gemini_client.models.generate_content(
+                model='gemini-2.0-flash-exp',  # Ya koi bhi model
+                contents=features_text,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    response_mime_type="application/json"
+                )
+            )
             
             # Parse response
             response_text = response.text.strip()
@@ -90,7 +68,6 @@ def get_prediction(features_list):
             # Parse JSON
             result = json.loads(response_text)
             
-            # Ensure required fields
             return {
                 "is_fraud": result.get("is_fraud", False),
                 "fraud_probability": result.get("fraud_probability", 0.0),
@@ -113,12 +90,16 @@ def create_feature_text(features_list):
                      'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
                      'V28', 'Amount']
     
-    text = ""
+    text = "Analyze this credit card transaction for fraud risk. Return ONLY JSON.\n\n"
+    text += "Transaction features:\n"
     for i, (name, value) in enumerate(zip(feature_names, features_list)):
-        if i == 0 or i == 29:  # Time and Amount
+        if i == 0 or i == 29:
             text += f"- {name}: {value:.2f}\n"
         else:
             text += f"- {name}: {value:.6f}\n"
+    
+    text += "\nReturn this exact JSON format:\n"
+    text += '{"is_fraud": true/false, "fraud_probability": 0.XX, "risk_score": XX.XX, "reason": "Brief reason"}'
     
     return text
 
@@ -201,8 +182,8 @@ def mock_predict(features_list):
 st.sidebar.header("⚙️ Configuration")
 
 # Show Gemini status
-if gemini_available:
-    st.sidebar.success("✅ Gemini API connected")
+if gemini_client:
+    st.sidebar.success("✅ Gemini API connected (google-genai)")
 else:
     st.sidebar.warning("⚠️ Using mock mode")
     st.sidebar.info("Add GEMINI_API_KEY to secrets for real predictions")
