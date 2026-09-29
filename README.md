@@ -1,4 +1,4 @@
-by# 🛡️ Credit Card Fraud Detection System 
+# 🛡️ Credit Card Fraud Detection System 
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green.svg)](https://fastapi.tiangolo.com/)
